@@ -12,16 +12,15 @@ import java.lang.ref.WeakReference
 
 class MainViewModel: ViewModel()
 {
+
     private var sensorManager: SensorManager? = null
     private var rotationMatrix= FloatArray(16)
-    private var accelerateData= FloatArray(3)
     private var magnetData= FloatArray(3)
-    private var orientationData= FloatArray(3)
-    private var valuesAccel = FloatArray(3)
-    private var valuesAccelMotion = FloatArray(3)
-    private var valuesAccelGravity = FloatArray(3)
-    private var valuesLinAccel = FloatArray(3)
-    private var valuesGravity = FloatArray(3)
+    private val rawAcceleration = FloatArray(3)
+    private var filteredGravity = FloatArray(3)
+    private var filteredAcceleration = FloatArray(3)
+
+    private var orientation = Orientation()
 
     private var accelerometer: WeakReference<Sensor?> = WeakReference(null)
     private var linearAccelerometer: WeakReference<Sensor?> = WeakReference(null)
@@ -88,54 +87,49 @@ class MainViewModel: ViewModel()
     {
         when (event.sensor.type)
         {
-            Sensor.TYPE_ACCELEROMETER       -> getAcceleration(event.values)
-            Sensor.TYPE_GRAVITY             -> getGravity(event.values)
-            Sensor.TYPE_LINEAR_ACCELERATION -> getLinearAcceleration(event.values)
-            Sensor.TYPE_MAGNETIC_FIELD -> magnetData = event.values.clone()
+            Sensor.TYPE_ACCELEROMETER       -> updateAcceleration(event.values)
+            Sensor.TYPE_LINEAR_ACCELERATION -> updateLinearAcceleration(event.values)
+            Sensor.TYPE_GRAVITY             -> updateGravity(event.values)
+            Sensor.TYPE_MAGNETIC_FIELD      -> magnetData = event.values.clone()
         }
 
-        SensorManager.getRotationMatrix(rotationMatrix, null, accelerateData, magnetData)
-        SensorManager.getOrientation(rotationMatrix, orientationData)
+        updateRotation()
 
-        val sb = StringBuilder("Orientation data:\n")
-        for (f in orientationData)
-            sb.appendLine(f)
-
-        orientationDataString.value = sb.toString()
-
-        sb.clear()
-        sb.appendLine("Linear accelerate data:")
-        sb.appendLine("x: ${valuesLinAccel[0]}, y: ${valuesLinAccel[1]}, z: ${valuesLinAccel[2]},")
-        sb.appendLine("Accelerate data:")
-        sb.appendLine("x: ${valuesAccel[0]}, y: ${valuesAccel[1]}, z: ${valuesAccel[2]},")
-        sb.appendLine("Accelerate gravity data:")
-        sb.appendLine("x: ${valuesAccelGravity[0]}, y: ${valuesAccelGravity[1]}, z: ${valuesAccelGravity[2]},")
-        sb.appendLine("Accelerate motion data:")
-        sb.appendLine("x: ${valuesAccelMotion[0]}, y: ${valuesAccelMotion[1]}, z: ${valuesAccelMotion[2]},")
-        sb.appendLine("Real gravity data:")
-        sb.appendLine("x: ${valuesGravity[0]}, y: ${valuesGravity[1]}, z: ${valuesGravity[2]},")
-
-        accelerateDataString.value = sb.toString()
+        orientationDataString.value = orientation.angleToString()
+        accelerateDataString.value = orientation.accelerationToString()
     }
 
-    private fun getLinearAcceleration(values: FloatArray)
+    private fun updateRotation()
     {
-        valuesLinAccel = values.clone()
+        val eulerAngle = FloatArray(3)
+        SensorManager.getRotationMatrix(rotationMatrix, null, orientation.calculated.rawAcceleration.array, magnetData)
+        SensorManager.getOrientation(rotationMatrix, eulerAngle)
+
+        orientation.eulerAngle.init(eulerAngle)
     }
 
-    private fun getGravity(values: FloatArray)
+    private fun updateLinearAcceleration(values: FloatArray)
     {
-        valuesGravity = values.clone()
+        orientation.linearAcceleration.init(values.clone())
     }
 
-    private fun getAcceleration(values: FloatArray)
+    private fun updateGravity(values: FloatArray)
     {
-        accelerateData = values.clone()
+        orientation.gravity.init(values.clone())
+    }
+
+    private fun updateAcceleration(values: FloatArray)
+    {
+        val accelerateData = values.clone()
         for (i in 0..2)
         {
-            valuesAccel[i] = values[i]
-            valuesAccelGravity[i] = (0.1f * values[i] + 0.9f * valuesAccelGravity[i])
-            valuesAccelMotion[i] = (values[i] - valuesAccelGravity[i])
+            rawAcceleration[i] = values[i]
+            filteredGravity[i] = (0.1f * values[i] + 0.9f * filteredGravity[i])
+            filteredAcceleration[i] = (values[i] - filteredGravity[i])
         }
+
+        orientation.calculated.rawAcceleration.init(rawAcceleration)
+        orientation.calculated.linearAcceleration.init(filteredAcceleration)
+        orientation.calculated.gravity.init(filteredGravity)
     }
 }
