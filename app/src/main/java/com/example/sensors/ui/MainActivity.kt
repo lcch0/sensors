@@ -1,8 +1,5 @@
 package com.example.sensors.ui
 
-import android.hardware.Sensor
-import android.hardware.SensorEvent
-import android.hardware.SensorEventListener
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -16,16 +13,17 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import com.example.sensors.ui.ui.theme.SensorsTheme
 
-class MainActivity : ComponentActivity(), SensorEventListener
+
+class MainActivity : ComponentActivity()
 {
     private val viewModel: MainViewModel by viewModels()
     override fun onCreate(savedInstanceState: Bundle?)
     {
         super.onCreate(savedInstanceState)
-        viewModel.init(this)
         setContent {
             SensorsTheme { // A surface container using the 'background' color from the theme
                 Surface(modifier = Modifier.fillMaxSize(),
@@ -39,25 +37,13 @@ class MainActivity : ComponentActivity(), SensorEventListener
     override fun onResume()
     {
         super.onResume()
-        viewModel.registerListener(this)
+        viewModel.registerAllSensors(this)
     }
 
     override fun onPause()
     {
-        viewModel.unregisterAll(this)
+        viewModel.unregisterAllSensors()
         super.onPause()
-    }
-
-    override fun onSensorChanged(event: SensorEvent?)
-    {
-        event?.let {
-            viewModel.loadSensorData(it)
-        }
-    }
-
-    override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int)
-    {
-        //do nothing yet
     }
 }
 
@@ -66,16 +52,16 @@ fun MainView(model: MainViewModel, modifier: Modifier = Modifier)
 {
     val text = remember { model.orientationDataString }
     val text1 = remember { model.accelerateDataString }
-    val sensors = remember { model.sensorsInfo }
+    val context = LocalContext.current
     Column {
         Text(text = text.value, modifier = modifier)
         Text(text = text1.value, modifier = modifier)
-        Text(text = sensors.value)
-        Button(onClick = { model.getAvailableSensors() }) {
-            Text(text = "Show available sensors")
+
+        Button(onClick = { model.unregisterAllSensors() }) {
+            Text(text = "Stop sensors")
         }
-        Button(onClick = { model.sensorsInfo.value = "" }) {
-            Text(text = "Hide available sensors")
+        Button(onClick = { model.registerAllSensors(context) }) {
+            Text(text = "Start sensors")
         }
     }
 
